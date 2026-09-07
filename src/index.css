@@ -4,4 +4,9 @@
   .font-condensed {
     font-family: 'Barlow Condensed', 'Oswald', Impact, -apple-system-headline, sans-serif;
   }
+  .pixelated {
+    image-rendering: -moz-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
 }
