@@ -43,23 +43,82 @@ const COLORS: ColorOption[] = [
 
 const BLACK_COLOR = COLORS[15]; // #1D1D21
 
+// Exact 20x40 8-bit alpha stencil extracted directly from official Minecraft border.png asset
+// (x: 1..20, y: 1..40) with exact 191/255 (75%) soft transitional alpha on 3rd row/column
+export const BORDER_MASK_DATA =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAoCAYAAAD+MdrbAAAAN0lEQVR4nO3MsQ0AIAwEsd9/KUaDAaAiQTQ+6VpnNpeX4Ch+BHM5EAgEAoFAIBD4B6y8gS21gwskw4Dzmc5EAwAAAABJRU5ErkJggg==';
+
+const borderPatternImage = typeof Image !== 'undefined' ? new Image() : ({} as HTMLImageElement);
+if (typeof Image !== 'undefined') {
+  borderPatternImage.src = BORDER_MASK_DATA;
+}
+
+// Cached offscreen canvas for tinted stencil compositing
+let offscreenCanvas: HTMLCanvasElement | null = null;
+let offscreenCtx: CanvasRenderingContext2D | null = null;
+
+function getOffscreenCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null {
+  if (typeof document === 'undefined') return null;
+  if (!offscreenCanvas) {
+    offscreenCanvas = document.createElement('canvas');
+    offscreenCanvas.width = 20;
+    offscreenCanvas.height = 40;
+    offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+  }
+  if (!offscreenCtx) return null;
+  return { canvas: offscreenCanvas, ctx: offscreenCtx };
+}
+
 function renderBanner(canvas: HTMLCanvasElement, snapshot: BannerSnapshot) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
+  ctx.imageSmoothingEnabled = false;
+
   // 1. Draw base color
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1.0;
   ctx.fillStyle = snapshot.baseColor.hex;
   ctx.fillRect(0, 0, 20, 40);
 
-  // 2. Draw pattern layers sequentially
+  // 2. Draw pattern layers sequentially using exact game alpha blending
+  const offscreen = getOffscreenCanvas();
+
   for (const layer of snapshot.layers) {
     if (layer.pattern === 'border') {
-      ctx.fillStyle = layer.color.hex;
-      // 2px border on all 4 edges (exact Minecraft bordure)
-      ctx.fillRect(0, 0, 20, 2); // Top
-      ctx.fillRect(0, 38, 20, 2); // Bottom
-      ctx.fillRect(0, 2, 2, 36); // Left
-      ctx.fillRect(18, 2, 2, 36); // Right
+      if (offscreen && borderPatternImage.complete && borderPatternImage.naturalWidth > 0) {
+        // Draw using official 8-bit alpha stencil
+        offscreen.ctx.clearRect(0, 0, 20, 40);
+        offscreen.ctx.globalCompositeOperation = 'source-over';
+        offscreen.ctx.drawImage(borderPatternImage, 0, 0, 20, 40);
+
+        // Tint stencil: 'source-in' replaces color with dye RGB while retaining exact 8-bit alpha
+        offscreen.ctx.globalCompositeOperation = 'source-in';
+        offscreen.ctx.fillStyle = layer.color.hex;
+        offscreen.ctx.fillRect(0, 0, 20, 40);
+
+        // Standard 'source-over' alpha composite onto banner
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(offscreen.canvas, 0, 0, 20, 40);
+      } else {
+        // Pixel-matched fallback while image loads:
+        // Outer 2 rows & cols: 100% opacity
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = layer.color.hex;
+        ctx.globalAlpha = 1.0;
+        ctx.fillRect(0, 0, 20, 2);
+        ctx.fillRect(0, 38, 20, 2);
+        ctx.fillRect(0, 2, 2, 36);
+        ctx.fillRect(18, 2, 2, 36);
+
+        // 3rd row & col: exactly 191/255 (~75%) opacity matching game texture
+        ctx.globalAlpha = 191 / 255;
+        ctx.fillRect(2, 2, 16, 1);
+        ctx.fillRect(2, 37, 16, 1);
+        ctx.fillRect(2, 3, 1, 34);
+        ctx.fillRect(17, 3, 1, 34);
+        ctx.globalAlpha = 1.0;
+      }
     }
   }
 }
@@ -128,6 +187,16 @@ export default function App() {
   useEffect(() => {
     if (!canvasRef.current) return;
     renderBanner(canvasRef.current, currentSnapshot);
+
+    const onImageLoaded = () => {
+      if (canvasRef.current) {
+        renderBanner(canvasRef.current, currentSnapshot);
+      }
+    };
+    if (borderPatternImage && !borderPatternImage.complete) {
+      borderPatternImage.addEventListener('load', onImageLoaded);
+      return () => borderPatternImage.removeEventListener('load', onImageLoaded);
+    }
   }, [currentSnapshot]);
 
   // Add layer handler (default border, black)
@@ -422,10 +491,17 @@ export default function App() {
                   {/* Square 2: Pattern Square (Border) */}
                   <div
                     id={`layer-pattern-${layer.id}`}
-                    className="relative h-8 w-8 aspect-square rounded-none shrink-0 border border-white/20 bg-[#121212] flex items-center justify-center p-1 select-none"
+                    className="relative h-8 w-8 aspect-square rounded-none shrink-0 border border-white/20 bg-[#121212] flex items-center justify-center p-0.5 select-none"
                     title="Pattern: Border"
                   >
-                    <div className="h-full aspect-[20/40] border-[2px] border-white bg-neutral-800 rounded-none" />
+                    <div className="relative h-full aspect-[20/40] bg-[#2a2a2a] overflow-hidden flex items-center justify-center">
+                      <img
+                        src={BORDER_MASK_DATA}
+                        alt="Border Pattern"
+                        className="w-full h-full object-contain"
+                        style={{ imageRendering: 'pixelated' }}
+                      />
+                    </div>
                   </div>
 
                   {/* Layer Label with only current color name */}
