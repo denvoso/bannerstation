@@ -1,0 +1,6 @@
+{
+  "name": "BANNERSTATION",
+  "description": "A minimalist black webpage featuring bold, condensed white BANNERSTATION typography.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
