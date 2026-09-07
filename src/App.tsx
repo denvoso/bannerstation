@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { Download } from 'lucide-react';
 
 interface ColorOption {
   name: string;
@@ -45,17 +46,51 @@ export default function App() {
     ctx.fillRect(0, 0, 20, 40);
   }, [currentColor]);
 
+  const handleDownloadPng = () => {
+    // Generate an exact 20x40px PNG
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = 20;
+    exportCanvas.height = 40;
+    const ctx = exportCanvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.fillStyle = currentColor.hex;
+    ctx.fillRect(0, 0, 20, 40);
+
+    const link = document.createElement('a');
+    link.download = `banner_${currentColor.name.toLowerCase().replace(/\s+/g, '_')}.png`;
+    link.href = exportCanvas.toDataURL('image/png');
+    link.click();
+  };
+
   return (
     <main
       id="bannerstation-screen"
       className="flex min-h-screen w-full flex-col items-center justify-center bg-black p-4 sm:p-6 gap-3 sm:gap-4 overflow-y-auto"
     >
-      <h1
-        id="bannerstation-title"
-        className="font-condensed text-center text-4xl font-extrabold uppercase tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl leading-none"
+      {/* Header with left-aligned title and right-aligned PNG download button */}
+      <header
+        id="bannerstation-header"
+        className="w-[min(88vw,calc(72vh-5rem))] max-w-[500px] flex items-center justify-between gap-3"
       >
-        BANNERSTATION
-      </h1>
+        <h1
+          id="bannerstation-title"
+          className="font-condensed text-left text-3xl sm:text-4xl md:text-5xl font-extrabold uppercase tracking-tight text-white leading-none"
+        >
+          BANNERSTATION
+        </h1>
+
+        <button
+          id="download-png-button"
+          type="button"
+          onClick={handleDownloadPng}
+          className="font-condensed font-bold tracking-wider text-xs sm:text-sm uppercase border border-neutral-700 hover:border-white text-white bg-[#171717] hover:bg-[#222222] transition-colors px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-none flex items-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+          title="Download 20x40 PNG"
+        >
+          <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span>PNG</span>
+        </button>
+      </header>
 
       {/* Banner Preview Square */}
       <div
