@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+html,
+body {
+  background-color: #000000;
+  color-scheme: dark;
+}
+
 @layer utilities {
   .font-condensed {
     font-family: 'Barlow Condensed', 'Oswald', Impact, -apple-system-headline, sans-serif;
